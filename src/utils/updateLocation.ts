@@ -1,16 +1,10 @@
 import {supabase} from '../lib/supabaseClinet';
 
-interface updateLocationProps {
-  userId: string;
-  latitude: number;
-  longitude: number;
-}
-
-export async function updateLocation({
-  userId,
-  latitude,
-  longitude,
-}: updateLocationProps) {
+export async function updateLocation(
+  userId: string,
+  latitude: number,
+  longitude: number
+) {
   const {error} = await supabase.from('user_locations').upsert({
     user_id: userId,
     latitude,
