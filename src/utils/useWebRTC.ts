@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from 'react';
 import {supabase} from '../lib/supabaseClinet';
 
-type Role = 'walker' | 'owner';
+type Role = 'walker' | 'owner' | null;
 
 export function useWebRTC(roomId: string, role: Role) {
   const peerRef = useRef<RTCPeerConnection | null>(null);

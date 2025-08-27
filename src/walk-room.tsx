@@ -7,7 +7,7 @@ export default function WalkRoom({
   role,
 }: {
   roomId: string;
-  role: 'walker' | 'owner';
+  role: 'walker' | 'owner' | null;
 }) {
   const {sendLocation, remoteLocation} = useWebRTC(roomId, role);
   const {mapContainerRef, updateRemoteMarker} = useGoogleMap();
