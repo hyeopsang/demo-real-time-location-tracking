@@ -2,9 +2,26 @@ import {useEffect} from 'react';
 import {useWebRTC} from './utils/useWebRTC';
 import {useGoogleMap} from './useGoogleMap';
 
-export default function WalkRoom({roomId}: {roomId: string}) {
-  const {remoteLocation} = useWebRTC(roomId); // 산책 알바 위치 수신
+export default function WalkRoom({
+  roomId,
+  role,
+}: {
+  roomId: string;
+  role: 'walker' | 'owner';
+}) {
+  const {sendLocation, remoteLocation} = useWebRTC(roomId, role);
   const {mapContainerRef, updateRemoteMarker} = useGoogleMap();
+
+  // 산책 알바 위치 전송 (본인이 walker일 때만)
+  useEffect(() => {
+    if (role !== 'walker') return;
+
+    const watcher = navigator.geolocation.watchPosition((pos) => {
+      sendLocation(pos.coords.latitude, pos.coords.longitude);
+    });
+
+    return () => navigator.geolocation.clearWatch(watcher);
+  }, [sendLocation, role]);
 
   // 산책 알바 위치 수신 시 지도 업데이트
   useEffect(() => {

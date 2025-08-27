@@ -1,7 +1,9 @@
 import {useEffect, useRef, useState} from 'react';
 import {supabase} from '../lib/supabaseClinet';
 
-export function useWebRTC(roomId: string) {
+type Role = 'walker' | 'owner';
+
+export function useWebRTC(roomId: string, role: Role) {
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
   const [remoteLocation, setRemoteLocation] = useState<{
@@ -17,14 +19,17 @@ export function useWebRTC(roomId: string) {
     const dataChannel = peer.createDataChannel('location');
     dataChannel.onmessage = (event) => {
       const loc = JSON.parse(event.data);
-      setRemoteLocation(loc);
+      // 산책 알바 위치만 수신
+      if (loc.role === 'walker') {
+        setRemoteLocation({lat: loc.lat, lng: loc.lng});
+      }
     };
     dataChannelRef.current = dataChannel;
 
-    // ICE Candidate 이벤트
+    // ICE Candidate
     peer.onicecandidate = (event) => {
       if (event.candidate) {
-        channel.send({
+        supabase.channel(roomId).send({
           type: 'broadcast',
           event: 'signal',
           payload: {type: 'candidate', data: event.candidate},
@@ -32,7 +37,7 @@ export function useWebRTC(roomId: string) {
       }
     };
 
-    // Supabase Realtime 채널
+    // 시그널 수신
     const channel = supabase.channel(roomId);
     channel
       .on('broadcast', {event: 'signal'}, async ({payload}) => {
@@ -60,9 +65,9 @@ export function useWebRTC(roomId: string) {
     };
   }, [roomId]);
 
-  // 내 위치 전송
+  // 위치 전송
   const sendLocation = (lat: number, lng: number) => {
-    dataChannelRef.current?.send(JSON.stringify({lat, lng}));
+    dataChannelRef.current?.send(JSON.stringify({lat, lng, role}));
   };
 
   return {sendLocation, remoteLocation};
