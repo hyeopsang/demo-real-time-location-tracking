@@ -15,10 +15,19 @@ export default function WalkRoom({
   // 산책 알바 위치 전송 (본인이 walker일 때만)
   useEffect(() => {
     if (role !== 'walker') return;
+    if (!navigator.geolocation) return;
 
-    const watcher = navigator.geolocation.watchPosition((pos) => {
-      sendLocation(pos.coords.latitude, pos.coords.longitude);
-    });
+    const watcher = navigator.geolocation.watchPosition(
+      (pos) => {
+        try {
+          sendLocation(pos.coords.latitude, pos.coords.longitude);
+        } catch (e) {
+          console.error('위치 전송 실패:', e);
+        }
+      },
+      (err) => console.error('위치 정보 가져오기 실패:', err),
+      {enableHighAccuracy: true}
+    );
 
     return () => navigator.geolocation.clearWatch(watcher);
   }, [sendLocation, role]);
