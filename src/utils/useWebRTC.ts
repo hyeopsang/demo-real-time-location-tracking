@@ -69,6 +69,7 @@ export function useWebRTC(roomId: string, role: Role) {
   const sendLocation = (lat: number, lng: number) => {
     dataChannelRef.current?.send(JSON.stringify({ lat, lng, role }));
   };
-
+  console.log(peerRef.current?.connectionState);
+  console.log(dataChannelRef.current?.readyState);
   return { sendLocation, remoteLocation };
 }

@@ -30,8 +30,6 @@ export const WalkRoom = ({ roomId, role }: WalkRoomProps) => {
   }, [center, role, sendMyLocation]);
 
   return (
-    <div style={{ width: "100%", height: "100vh" }}>
-      <div ref={mapContainerRef} style={{ width: "100%", height: "100%" }} />
-    </div>
+    <div ref={mapContainerRef} style={{ width: "100%", height: "100%" }} />
   );
 };
