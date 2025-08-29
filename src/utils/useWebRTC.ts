@@ -1,7 +1,7 @@
-import {useEffect, useRef, useState} from 'react';
-import {supabase} from '../lib/supabaseClinet';
+import { useEffect, useRef, useState } from "react";
+import { supabase } from "../lib/supabaseClinet";
 
-type Role = 'walker' | 'owner' | null;
+type Role = "walker" | "owner" | null;
 
 export function useWebRTC(roomId: string, role: Role) {
   const peerRef = useRef<RTCPeerConnection | null>(null);
@@ -16,12 +16,12 @@ export function useWebRTC(roomId: string, role: Role) {
     peerRef.current = peer;
 
     // DataChannel 생성 (호스트 측)
-    const dataChannel = peer.createDataChannel('location');
+    const dataChannel = peer.createDataChannel("location");
     dataChannel.onmessage = (event) => {
       const loc = JSON.parse(event.data);
       // 산책 알바 위치만 수신
-      if (loc.role === 'walker') {
-        setRemoteLocation({lat: loc.lat, lng: loc.lng});
+      if (loc.role === "walker") {
+        setRemoteLocation({ lat: loc.lat, lng: loc.lng });
       }
     };
     dataChannelRef.current = dataChannel;
@@ -30,9 +30,9 @@ export function useWebRTC(roomId: string, role: Role) {
     peer.onicecandidate = (event) => {
       if (event.candidate) {
         supabase.channel(roomId).send({
-          type: 'broadcast',
-          event: 'signal',
-          payload: {type: 'candidate', data: event.candidate},
+          type: "broadcast",
+          event: "signal",
+          payload: { type: "candidate", data: event.candidate },
         });
       }
     };
@@ -40,20 +40,20 @@ export function useWebRTC(roomId: string, role: Role) {
     // 시그널 수신
     const channel = supabase.channel(roomId);
     channel
-      .on('broadcast', {event: 'signal'}, async ({payload}) => {
-        const {type, data} = payload;
-        if (type === 'offer') {
+      .on("broadcast", { event: "signal" }, async ({ payload }) => {
+        const { type, data } = payload;
+        if (type === "offer") {
           await peer.setRemoteDescription(data);
           const answer = await peer.createAnswer();
           await peer.setLocalDescription(answer);
           channel.send({
-            type: 'broadcast',
-            event: 'signal',
-            payload: {type: 'answer', data: answer},
+            type: "broadcast",
+            event: "signal",
+            payload: { type: "answer", data: answer },
           });
-        } else if (type === 'answer') {
+        } else if (type === "answer") {
           await peer.setRemoteDescription(data);
-        } else if (type === 'candidate') {
+        } else if (type === "candidate") {
           await peer.addIceCandidate(data);
         }
       })
@@ -67,8 +67,8 @@ export function useWebRTC(roomId: string, role: Role) {
 
   // 위치 전송
   const sendLocation = (lat: number, lng: number) => {
-    dataChannelRef.current?.send(JSON.stringify({lat, lng, role}));
+    dataChannelRef.current?.send(JSON.stringify({ lat, lng, role }));
   };
 
-  return {sendLocation, remoteLocation};
+  return { sendLocation, remoteLocation };
 }

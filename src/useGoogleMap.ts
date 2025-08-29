@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Loader } from "@googlemaps/js-api-loader";
 import { useMapStateStore } from "./store/mapStateStore";
+import { useWalkerStateStore } from "./store/walkerStateStore";
 
 export const useGoogleMap = (
   mapId = "DEMO_MAP_ID",
@@ -12,6 +13,7 @@ export const useGoogleMap = (
   const center = useMapStateStore((state) => state.center);
   const zoom = useMapStateStore((state) => state.zoom);
   const setCenter = useMapStateStore((state) => state.setCenter);
+  const walkerCenter = useWalkerStateStore((state) => state.center);
 
   // 내 위치 마커
   const userMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(
@@ -89,23 +91,25 @@ export const useGoogleMap = (
     });
   }, [mapId, defaultCenter, setCenter, center, zoom]);
 
-  // 상대 위치 업데이트
-  const updateRemoteMarker = (lat: number, lng: number) => {
+  const updateRemoteMarker = () => {
     if (!mapRef.current) return;
 
     if (!remoteMarkerRef.current) {
-      // 상대 마커 생성
       remoteMarkerRef.current = new google.maps.Marker({
         map: mapRef.current,
-        position: { lat, lng },
+        position: walkerCenter,
         title: "상대 위치",
         icon: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
       });
     } else {
-      // 위치 갱신
-      remoteMarkerRef.current.setPosition({ lat, lng });
+      remoteMarkerRef.current.setPosition(walkerCenter);
     }
   };
+
+  // walkerCenter 변경 시 자동 갱신
+  useEffect(() => {
+    updateRemoteMarker();
+  }, [walkerCenter]);
 
   return { mapContainerRef, updateRemoteMarker };
 };
