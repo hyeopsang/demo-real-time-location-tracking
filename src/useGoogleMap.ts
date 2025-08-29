@@ -1,12 +1,23 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Loader } from "@googlemaps/js-api-loader";
+import { useMapStateStore } from "./store/mapStateStore";
 
 export const useGoogleMap = (
   mapId = "DEMO_MAP_ID",
   defaultCenter = { lat: 37.5665, lng: 126.978 }
 ) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
+  const mapRef = useRef<google.maps.Map | null>(null);
+
+  const center = useMapStateStore((state) => state.center);
+  const zoom = useMapStateStore((state) => state.zoom);
+  const setCenter = useMapStateStore((state) => state.setCenter);
+
+  // 내 위치 마커
+  const userMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(
+    null
+  );
+  // 상대 위치 마커
   const remoteMarkerRef = useRef<google.maps.Marker | null>(null);
 
   // 지도 초기화
@@ -24,58 +35,65 @@ export const useGoogleMap = (
         "marker"
       )) as google.maps.MarkerLibrary;
 
-      const initMap = (center: google.maps.LatLngLiteral) => {
-        if (!mapContainerRef.current) return;
+      if (!mapContainerRef.current) return;
 
-        const map = new Map(mapContainerRef.current, {
-          zoom: 17,
-          center,
-          mapId,
-          disableDefaultUI: true,
-        });
+      const map = new Map(mapContainerRef.current, {
+        zoom,
+        center,
+        mapId,
+        disableDefaultUI: true,
+      });
 
-        setMapInstance(map);
+      mapRef.current = map;
 
-        const userMarker = new AdvancedMarkerElement({
-          map,
-          position: center,
-          title: "내 위치",
-        });
+      // 내 위치 마커 생성
+      userMarkerRef.current = new AdvancedMarkerElement({
+        map,
+        position: center,
+        title: "내 위치",
+      });
 
-        userMarker.addListener("gmp-click", () => {
-          map.setCenter(center);
-        });
-      };
+      userMarkerRef.current.addListener("gmp-click", () => {
+        map.setCenter(center);
+      });
 
+      // 내 위치 가져오기
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
-            initMap({
+            const newCenter = {
               lat: position.coords.latitude,
               lng: position.coords.longitude,
-            });
+            };
+            setCenter(newCenter);
+            map.setCenter(newCenter);
           },
           () => {
-            initMap(defaultCenter);
+            setCenter(defaultCenter);
+            map.setCenter(defaultCenter);
           }
         );
       } else {
-        initMap(defaultCenter);
+        setCenter(defaultCenter);
+        map.setCenter(defaultCenter);
       }
     });
-  }, [mapId, defaultCenter]);
+  }, [mapId, defaultCenter, setCenter, center, zoom]);
 
   // 상대 위치 업데이트
   const updateRemoteMarker = (lat: number, lng: number) => {
-    if (!mapInstance) return;
+    if (!mapRef.current) return;
+
     if (!remoteMarkerRef.current) {
+      // 상대 마커 생성
       remoteMarkerRef.current = new google.maps.Marker({
-        map: mapInstance,
+        map: mapRef.current,
         position: { lat, lng },
         title: "상대 위치",
         icon: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
       });
     } else {
+      // 위치 갱신
       remoteMarkerRef.current.setPosition({ lat, lng });
     }
   };
