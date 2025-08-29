@@ -66,15 +66,24 @@ export const useGoogleMap = (
               lng: position.coords.longitude,
             };
             setCenter(newCenter);
+            if (userMarkerRef.current) {
+              userMarkerRef.current.position = newCenter;
+            }
             map.setCenter(newCenter);
           },
           () => {
             setCenter(defaultCenter);
+            if (userMarkerRef.current) {
+              userMarkerRef.current.position = defaultCenter;
+            }
             map.setCenter(defaultCenter);
           }
         );
       } else {
         setCenter(defaultCenter);
+        if (userMarkerRef.current) {
+          userMarkerRef.current.position = defaultCenter;
+        }
         map.setCenter(defaultCenter);
       }
     });
