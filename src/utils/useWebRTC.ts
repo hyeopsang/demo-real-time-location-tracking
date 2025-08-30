@@ -15,51 +15,48 @@ export function useWebRTC(roomId: string, role: Role) {
     const peer = new RTCPeerConnection();
     peerRef.current = peer;
 
-    // DataChannel 생성 (호스트 측)
+    // 채널은 한 번만 생성
+    const channel = supabase.channel(roomId);
+
+    // DataChannel 생성
     const dataChannel = peer.createDataChannel("location");
+    dataChannelRef.current = dataChannel;
+
+    dataChannel.onopen = () => {
+      console.log("알바 data channel open ✅");
+    };
+    dataChannel.onclose = () => {
+      console.log("알바 data channel closed ❌");
+    };
     dataChannel.onmessage = (event) => {
       const loc = JSON.parse(event.data);
-      // 산책 알바 위치만 수신
       if (loc.role === "walker") {
         setRemoteLocation({ lat: loc.lat, lng: loc.lng });
       }
     };
-    dataChannelRef.current = dataChannel;
 
-    // ICE Candidate
+    // ICE Candidate 수집 및 전송
     peer.onicecandidate = (event) => {
       if (event.candidate) {
-        supabase.channel(roomId).send({
+        console.log("알바 ICE candidate:", event.candidate);
+        channel.send({
           type: "broadcast",
           event: "signal",
           payload: { type: "candidate", data: event.candidate },
         });
       }
-      peer.onconnectionstatechange = () => {
-        console.log("알바 connectionState:", peer.connectionState);
-      };
-
-      dataChannel.onopen = () => {
-        console.log("알바 data channel open");
-      };
-
-      dataChannel.onclose = () => {
-        console.log("알바 data channel closed");
-      };
     };
-    peer.onicecandidate = (event) => {
-      if (event.candidate) {
-        console.log("알바 ICE candidate:", event.candidate);
-        // Supabase로 candidate 전송
-      }
+
+    peer.onconnectionstatechange = () => {
+      console.log("알바 connectionState:", peer.connectionState);
     };
 
     // 시그널 수신
-    const channel = supabase.channel(roomId);
     channel
       .on("broadcast", { event: "signal" }, async ({ payload }) => {
         const { type, data } = payload;
         if (type === "offer") {
+          console.log("알바: offer 수신");
           await peer.setRemoteDescription(data);
           const answer = await peer.createAnswer();
           await peer.setLocalDescription(answer);
@@ -69,8 +66,10 @@ export function useWebRTC(roomId: string, role: Role) {
             payload: { type: "answer", data: answer },
           });
         } else if (type === "answer") {
+          console.log("알바: answer 수신");
           await peer.setRemoteDescription(data);
         } else if (type === "candidate") {
+          console.log("알바: candidate 수신");
           await peer.addIceCandidate(data);
         }
       })
@@ -82,12 +81,9 @@ export function useWebRTC(roomId: string, role: Role) {
     };
   }, [roomId]);
 
-  // 위치 전송
   const sendLocation = (lat: number, lng: number) => {
     dataChannelRef.current?.send(JSON.stringify({ lat, lng, role }));
   };
-  console.log(peerRef.current?.connectionState);
-  console.log(dataChannelRef.current?.readyState);
 
   return { sendLocation, remoteLocation };
 }
