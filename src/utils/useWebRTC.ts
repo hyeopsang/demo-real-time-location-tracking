@@ -15,21 +15,28 @@ export function useWebRTC(roomId: string, role: Role) {
     const peer = new RTCPeerConnection();
     peerRef.current = peer;
 
-    // DataChannel 생성 (호스트 측)
-    const dataChannel = peer.createDataChannel("location");
-    dataChannel.onmessage = (event) => {
-      const loc = JSON.parse(event.data);
-      // 산책 알바 위치만 수신
-      if (loc.role === "walker") {
-        setRemoteLocation({ lat: loc.lat, lng: loc.lng });
-      }
-    };
+    const channel = supabase.channel(roomId, {
+      config: {
+        broadcast: { self: true, ack: true },
+      },
+    });
+
+    // DataChannel 생성
+    const dataChannel = peer.createDataChannel("user_locations");
     dataChannelRef.current = dataChannel;
 
-    // ICE Candidate
+    dataChannel.onopen = () => console.log("DataChannel open ✅");
+    dataChannel.onclose = () => console.log("DataChannel closed ❌");
+    dataChannel.onmessage = (e) => {
+      const loc = JSON.parse(e.data);
+      if (loc.role === "walker")
+        setRemoteLocation({ lat: loc.lat, lng: loc.lng });
+    };
+
+    // ICE candidate 전송
     peer.onicecandidate = (event) => {
       if (event.candidate) {
-        supabase.channel(roomId).send({
+        channel.send({
           type: "broadcast",
           event: "signal",
           payload: { type: "candidate", data: event.candidate },
@@ -38,7 +45,6 @@ export function useWebRTC(roomId: string, role: Role) {
     };
 
     // 시그널 수신
-    const channel = supabase.channel(roomId);
     channel
       .on("broadcast", { event: "signal" }, async ({ payload }) => {
         const { type, data } = payload;
