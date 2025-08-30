@@ -34,6 +34,12 @@ export function useWebRTC(roomId: string, role: Role) {
       dataChannel.onclose = () => console.log("Owner DataChannel closed ❌");
       dataChannel.onerror = (err) =>
         console.log("Owner DataChannel Error:", err);
+      peer.oniceconnectionstatechange = () => {
+        console.log("ICE State:", peer.iceConnectionState);
+      };
+      peer.onsignalingstatechange = () => {
+        console.log("Signaling State:", peer.signalingState);
+      };
     } else {
       // 워커는 DataChannel을 peer.ondatachannel로 받음
       peer.ondatachannel = (event) => {
