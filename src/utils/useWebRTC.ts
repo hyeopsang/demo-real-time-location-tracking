@@ -35,6 +35,23 @@ export function useWebRTC(roomId: string, role: Role) {
           payload: { type: "candidate", data: event.candidate },
         });
       }
+      peer.onconnectionstatechange = () => {
+        console.log("알바 connectionState:", peer.connectionState);
+      };
+
+      dataChannel.onopen = () => {
+        console.log("알바 data channel open");
+      };
+
+      dataChannel.onclose = () => {
+        console.log("알바 data channel closed");
+      };
+    };
+    peer.onicecandidate = (event) => {
+      if (event.candidate) {
+        console.log("알바 ICE candidate:", event.candidate);
+        // Supabase로 candidate 전송
+      }
     };
 
     // 시그널 수신
@@ -71,5 +88,6 @@ export function useWebRTC(roomId: string, role: Role) {
   };
   console.log(peerRef.current?.connectionState);
   console.log(dataChannelRef.current?.readyState);
+
   return { sendLocation, remoteLocation };
 }
