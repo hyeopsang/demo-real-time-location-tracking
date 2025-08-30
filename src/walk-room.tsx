@@ -19,14 +19,10 @@ export const WalkRoom = ({ roomId, role }: WalkRoomProps) => {
 
   // 위치가 바뀔 때마다 내 위치 전송 (2초마다)
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (center && role === "walker") {
-        // 워커일 때만 위치 전송
-        sendMyLocation(center.lat, center.lng);
-      }
-    }, 2000);
-
-    return () => clearInterval(interval);
+    if (center && role === "walker") {
+      // 워커일 때만 위치 전송
+      sendMyLocation(center.lat, center.lng);
+    }
   }, [center, role, sendMyLocation]);
 
   return (
