@@ -6,10 +6,11 @@ type Role = "walker" | "owner" | null;
 export function useWebRTC(roomId: string, role: Role) {
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
-  const [remoteLocation] = useState<{
+  const [remoteLocation, setRemoteLocation] = useState<{
     lat: number;
     lng: number;
   } | null>(null);
+  const [remoteConnected, setRemoteConnected] = useState(false); // 상대 연결 여부
 
   useEffect(() => {
     const peer = new RTCPeerConnection({
@@ -40,12 +41,28 @@ export function useWebRTC(roomId: string, role: Role) {
     if (role === "owner") {
       const dc = peer.createDataChannel("location_channel");
       dataChannelRef.current = dc;
-      dc.onopen = () => console.log("Owner channel open ✅");
+
+      dc.onopen = () => {
+        console.log("Owner channel open ✅");
+        setRemoteConnected(true); // 상대가 연결되었음을 표시
+      };
+      dc.onclose = () => setRemoteConnected(false);
     } else {
       peer.ondatachannel = (event) => {
         const dc = event.channel;
         dataChannelRef.current = dc;
-        dc.onopen = () => console.log("Worker channel open ✅");
+
+        dc.onopen = () => {
+          console.log("Worker channel open ✅");
+          setRemoteConnected(true); // 상대가 연결되었음을 표시
+        };
+        dc.onclose = () => setRemoteConnected(false);
+
+        dc.onmessage = (e) => {
+          const loc = JSON.parse(e.data);
+          if (loc.role === "walker")
+            setRemoteLocation({ lat: loc.lat, lng: loc.lng });
+        };
       };
     }
 
@@ -56,7 +73,6 @@ export function useWebRTC(roomId: string, role: Role) {
         if (senderRole === role) return; // 내 메시지는 무시
 
         if (type === "offer") {
-          // remote offer 세팅 → answer 생성
           await peer.setRemoteDescription(data);
           const answer = await peer.createAnswer();
           await peer.setLocalDescription(answer);
@@ -66,10 +82,8 @@ export function useWebRTC(roomId: string, role: Role) {
             payload: { type: "answer", data: answer, role },
           });
         } else if (type === "answer") {
-          // remote answer 세팅
           await peer.setRemoteDescription(data);
         } else if (type === "candidate") {
-          // candidate 추가
           await peer.addIceCandidate(data);
         }
       })
@@ -108,5 +122,5 @@ export function useWebRTC(roomId: string, role: Role) {
     channel.send(JSON.stringify({ lat, lng, role }));
   };
 
-  return { sendLocation, remoteLocation };
+  return { sendLocation, remoteLocation, remoteConnected };
 }
