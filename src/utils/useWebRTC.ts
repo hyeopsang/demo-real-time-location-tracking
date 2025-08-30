@@ -6,7 +6,7 @@ type Role = "walker" | "owner" | null;
 export function useWebRTC(roomId: string, role: Role) {
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
-  const [remoteLocation, setRemoteLocation] = useState<{
+  const [remoteLocation] = useState<{
     lat: number;
     lng: number;
   } | null>(null);
@@ -15,54 +15,18 @@ export function useWebRTC(roomId: string, role: Role) {
     const peer = new RTCPeerConnection({
       iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
     });
-    peer.createDataChannel("test");
-    peer.createOffer().then((o) => peer.setLocalDescription(o));
-    peer.onicecandidate = (e) => console.log("ICE candidate:", e.candidate);
     peerRef.current = peer;
 
-    // Supabase 채널 하나
     const channel = supabase.channel(roomId);
 
-    // 역할에 따라 DataChannel 생성
-    if (role === "owner") {
-      const dataChannel = peer.createDataChannel("location_channel");
-      dataChannelRef.current = dataChannel;
+    // 로그용 이벤트
+    peer.oniceconnectionstatechange = () =>
+      console.log("ICE State:", peer.iceConnectionState);
+    peer.onsignalingstatechange = () =>
+      console.log("Signaling State:", peer.signalingState);
 
-      dataChannel.onopen = () => {
-        console.log("Owner DataChannel open ✅"); // 여기서 open 메시지
-      };
-      dataChannel.onclose = () => console.log("Owner DataChannel closed ❌");
-      dataChannel.onerror = (err) =>
-        console.log("Owner DataChannel Error:", err);
-      peer.oniceconnectionstatechange = () => {
-        console.log("ICE State:", peer.iceConnectionState);
-      };
-      peer.onsignalingstatechange = () => {
-        console.log("Signaling State:", peer.signalingState);
-      };
-    } else {
-      // 워커는 DataChannel을 peer.ondatachannel로 받음
-      peer.ondatachannel = (event) => {
-        const channel = event.channel;
-        dataChannelRef.current = channel;
-
-        channel.onopen = () => console.log("Worker DataChannel open ✅"); // 여기서 open 메시지
-        channel.onclose = () => console.log("Worker DataChannel closed ❌");
-        channel.onerror = (err) =>
-          console.log("Worker DataChannel Error:", err);
-
-        channel.onmessage = (e) => {
-          const loc = JSON.parse(e.data);
-          if (loc.role === "walker")
-            setRemoteLocation({ lat: loc.lat, lng: loc.lng });
-        };
-      };
-    }
-
-    // ICE Candidate
+    // candidate 발생 시 전송
     peer.onicecandidate = (event) => {
-      console.log("ICE candidate:", event.candidate);
-
       if (event.candidate) {
         channel.send({
           type: "broadcast",
@@ -72,15 +36,27 @@ export function useWebRTC(roomId: string, role: Role) {
       }
     };
 
-    // 시그널 수신
+    // DataChannel 준비
+    if (role === "owner") {
+      const dc = peer.createDataChannel("location_channel");
+      dataChannelRef.current = dc;
+      dc.onopen = () => console.log("Owner channel open ✅");
+    } else {
+      peer.ondatachannel = (event) => {
+        const dc = event.channel;
+        dataChannelRef.current = dc;
+        dc.onopen = () => console.log("Worker channel open ✅");
+      };
+    }
+
+    // 시그널링 수신
     channel
       .on("broadcast", { event: "shout" }, async ({ payload }) => {
         const { type, data, role: senderRole } = payload;
-
-        // 자신이 보낸 시그널은 무시
-        if (senderRole === role) return;
+        if (senderRole === role) return; // 내 메시지는 무시
 
         if (type === "offer") {
+          // remote offer 세팅 → answer 생성
           await peer.setRemoteDescription(data);
           const answer = await peer.createAnswer();
           await peer.setLocalDescription(answer);
@@ -90,18 +66,34 @@ export function useWebRTC(roomId: string, role: Role) {
             payload: { type: "answer", data: answer, role },
           });
         } else if (type === "answer") {
+          // remote answer 세팅
           await peer.setRemoteDescription(data);
         } else if (type === "candidate") {
+          // candidate 추가
           await peer.addIceCandidate(data);
         }
       })
       .subscribe();
+
+    // Offer 생성 및 전송 (owner만)
+    if (role === "owner") {
+      (async () => {
+        const offer = await peer.createOffer();
+        await peer.setLocalDescription(offer);
+        channel.send({
+          type: "broadcast",
+          event: "shout",
+          payload: { type: "offer", data: offer, role },
+        });
+      })();
+    }
 
     return () => {
       peer.close();
       channel.unsubscribe();
     };
   }, [roomId, role]);
+
   const waitForOpenChannel = (channel: RTCDataChannel) =>
     new Promise<void>((resolve) => {
       if (channel.readyState === "open") return resolve();
