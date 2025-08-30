@@ -6,11 +6,8 @@ type Role = "walker" | "owner" | null;
 export function useWebRTC(roomId: string, role: Role) {
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
-  const [remoteLocation, setRemoteLocation] = useState<{
-    lat: number;
-    lng: number;
-  } | null>(null);
-  const [remoteConnected, setRemoteConnected] = useState(false); // 상대 연결 여부
+  const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
+  const [remoteLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     const peer = new RTCPeerConnection({
@@ -40,6 +37,7 @@ export function useWebRTC(roomId: string, role: Role) {
         },
       ],
     });
+
     peerRef.current = peer;
 
     const channel = supabase.channel(roomId);
