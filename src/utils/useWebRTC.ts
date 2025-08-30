@@ -44,13 +44,12 @@ export function useWebRTC(roomId: string, role: Role) {
 
     const channel = supabase.channel(roomId);
 
-    // 로그용 이벤트
     peer.oniceconnectionstatechange = () =>
       console.log("ICE State:", peer.iceConnectionState);
     peer.onsignalingstatechange = () =>
       console.log("Signaling State:", peer.signalingState);
 
-    // candidate 발생 시 전송
+    // ICE Candidate 발생 시
     peer.onicecandidate = (event) => {
       if (event.candidate) {
         channel.send({
@@ -62,42 +61,31 @@ export function useWebRTC(roomId: string, role: Role) {
     };
 
     // DataChannel 준비
-    if (role === "owner") {
-      const dc = peer.createDataChannel("location_channel");
+    const setupDataChannel = (dc: RTCDataChannel) => {
       dataChannelRef.current = dc;
+      dc.onopen = () => console.log(`${role} channel open ✅`);
+      dc.onmessage = (msg) => console.log("received msg:", msg.data);
+    };
 
-      dc.onopen = () => {
-        console.log("Owner channel open ✅");
-        setRemoteConnected(true); // 상대가 연결되었음을 표시
-      };
-      dc.onclose = () => setRemoteConnected(false);
+    if (role === "owner") {
+      setupDataChannel(peer.createDataChannel("location_channel"));
     } else {
-      peer.ondatachannel = (event) => {
-        const dc = event.channel;
-        dataChannelRef.current = dc;
-
-        dc.onopen = () => {
-          console.log("Worker channel open ✅");
-          setRemoteConnected(true); // 상대가 연결되었음을 표시
-        };
-        dc.onclose = () => setRemoteConnected(false);
-
-        dc.onmessage = (e) => {
-          const loc = JSON.parse(e.data);
-          if (loc.role === "walker")
-            setRemoteLocation({ lat: loc.lat, lng: loc.lng });
-        };
-      };
+      peer.ondatachannel = (event) => setupDataChannel(event.channel);
     }
 
     // 시그널링 수신
     channel
       .on("broadcast", { event: "shout" }, async ({ payload }) => {
         const { type, data, role: senderRole } = payload;
-        if (senderRole === role) return; // 내 메시지는 무시
+        if (senderRole === role) return;
 
         if (type === "offer") {
           await peer.setRemoteDescription(data);
+          // Pending candidates 추가
+          for (const cand of pendingCandidates.current) {
+            await peer.addIceCandidate(cand);
+          }
+          pendingCandidates.current = [];
           const answer = await peer.createAnswer();
           await peer.setLocalDescription(answer);
           channel.send({
@@ -107,13 +95,22 @@ export function useWebRTC(roomId: string, role: Role) {
           });
         } else if (type === "answer") {
           await peer.setRemoteDescription(data);
+          for (const cand of pendingCandidates.current) {
+            await peer.addIceCandidate(cand);
+          }
+          pendingCandidates.current = [];
         } else if (type === "candidate") {
-          await peer.addIceCandidate(data);
+          // RemoteDescription 세팅 전이면 pending에 저장
+          if (!peer.remoteDescription) {
+            pendingCandidates.current.push(data);
+          } else {
+            await peer.addIceCandidate(data);
+          }
         }
       })
       .subscribe();
 
-    // Offer 생성 및 전송 (owner만)
+    // Owner가 Offer 생성
     if (role === "owner") {
       (async () => {
         const offer = await peer.createOffer();
@@ -138,7 +135,6 @@ export function useWebRTC(roomId: string, role: Role) {
       channel.onopen = () => resolve();
     });
 
-  // 위치 전송
   const sendLocation = async (lat: number, lng: number) => {
     const channel = dataChannelRef.current;
     if (!channel) return;
@@ -146,5 +142,5 @@ export function useWebRTC(roomId: string, role: Role) {
     channel.send(JSON.stringify({ lat, lng, role }));
   };
 
-  return { sendLocation, remoteLocation, remoteConnected };
+  return { sendLocation, remoteLocation };
 }
