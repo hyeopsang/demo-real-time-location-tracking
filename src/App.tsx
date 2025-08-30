@@ -2,12 +2,12 @@ import { useState } from "react";
 import { WalkRoom } from "./walk-room";
 
 function App() {
-  const [role, setRole] = useState<"walker" | "owner" | null>(null);
+  const [role, setRole] = useState<"walker" | "owner">("owner");
   const roomId = "room-123"; // WebRTC 룸 ID
 
-  // 역할 선택 전이면 버튼 보여주기
-  if (!role) {
-    return (
+  // 역할 선택 후 WalkRoom 렌더링
+  return (
+    <div style={{ width: "100%", height: "100vh" }}>
       <div style={{ textAlign: "center", marginTop: "50px" }}>
         <h2>역할을 선택하세요</h2>
         <button
@@ -23,12 +23,6 @@ function App() {
           오너
         </button>
       </div>
-    );
-  }
-
-  // 역할 선택 후 WalkRoom 렌더링
-  return (
-    <div style={{ width: "100%", height: "100vh" }}>
       <WalkRoom roomId={roomId} role={role} />
     </div>
   );
