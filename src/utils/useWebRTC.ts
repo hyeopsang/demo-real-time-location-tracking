@@ -15,6 +15,9 @@ export function useWebRTC(roomId: string, role: Role) {
     const peer = new RTCPeerConnection({
       iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
     });
+    peer.createDataChannel("test");
+    peer.createOffer().then((o) => peer.setLocalDescription(o));
+    peer.onicecandidate = (e) => console.log("ICE candidate:", e.candidate);
     peerRef.current = peer;
 
     // Supabase 채널 하나
