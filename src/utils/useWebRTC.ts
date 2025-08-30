@@ -16,7 +16,25 @@ export function useWebRTC(roomId: string, role: Role) {
     const peer = new RTCPeerConnection({
       iceServers: [
         {
+          urls: "stun:stun.relay.metered.ca:80",
+        },
+        {
           urls: "turn:global.relay.metered.ca:80",
+          username: "401c6ad59fbd6eb949f8363e",
+          credential: "2xfL/LLRw0iGnDP8",
+        },
+        {
+          urls: "turn:global.relay.metered.ca:80?transport=tcp",
+          username: "401c6ad59fbd6eb949f8363e",
+          credential: "2xfL/LLRw0iGnDP8",
+        },
+        {
+          urls: "turn:global.relay.metered.ca:443",
+          username: "401c6ad59fbd6eb949f8363e",
+          credential: "2xfL/LLRw0iGnDP8",
+        },
+        {
+          urls: "turns:global.relay.metered.ca:443?transport=tcp",
           username: "401c6ad59fbd6eb949f8363e",
           credential: "2xfL/LLRw0iGnDP8",
         },
