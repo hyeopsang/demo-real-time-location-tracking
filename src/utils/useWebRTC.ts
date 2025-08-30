@@ -15,44 +15,52 @@ export function useWebRTC(roomId: string, role: Role) {
     const peer = new RTCPeerConnection();
     peerRef.current = peer;
 
-    const channel = supabase.channel("doggy");
+    // Supabase 채널 하나
+    const channel = supabase.channel(roomId);
 
-    // DataChannel 생성
-    const dataChannel = peer.createDataChannel("user_location");
-    dataChannelRef.current = dataChannel;
+    // 역할에 따라 DataChannel 생성
+    if (role === "owner") {
+      const dataChannel = peer.createDataChannel("location_channel");
+      dataChannelRef.current = dataChannel;
 
-    dataChannel.onopen = () => {
-      console.log("DataChannel open ✅");
-      alert("DataChannel open ✅");
-    };
-    dataChannel.onclose = () => {
-      console.log("DataChannel closed ❌");
-      alert("DataChannel closed ❌");
-    };
-    dataChannel.onmessage = (e) => {
-      const loc = JSON.parse(e.data);
-      if (loc.role === "walker") {
-        setRemoteLocation({ lat: loc.lat, lng: loc.lng });
-        alert(`워커 위치 수신: lat ${loc.lat}, lng ${loc.lng}`);
-      }
-    };
+      dataChannel.onopen = () => console.log("Owner DataChannel open ✅");
+      dataChannel.onclose = () => console.log("Owner DataChannel closed ❌");
+      dataChannel.onerror = (err) =>
+        console.log("Owner DataChannel Error:", err);
+    } else {
+      // 워커는 DataChannel을 peer.ondatachannel로 받음
+      peer.ondatachannel = (event) => {
+        dataChannelRef.current = event.channel;
+        event.channel.onmessage = (e) => {
+          const loc = JSON.parse(e.data);
+          if (loc.role === "walker")
+            setRemoteLocation({ lat: loc.lat, lng: loc.lng });
+        };
+        event.channel.onopen = () => console.log("Worker DataChannel open ✅");
+        event.channel.onclose = () =>
+          console.log("Worker DataChannel closed ❌");
+      };
+    }
 
-    // ICE candidate 전송
+    // ICE Candidate
     peer.onicecandidate = (event) => {
       if (event.candidate) {
         channel.send({
           type: "broadcast",
           event: "shout",
-          payload: { type: "candidate", data: event.candidate },
+          payload: { type: "candidate", data: event.candidate, role },
         });
-        alert("ICE candidate 전송 ✅");
       }
     };
 
     // 시그널 수신
     channel
       .on("broadcast", { event: "shout" }, async ({ payload }) => {
-        const { type, data } = payload;
+        const { type, data, role: senderRole } = payload;
+
+        // 자신이 보낸 시그널은 무시
+        if (senderRole === role) return;
+
         if (type === "offer") {
           await peer.setRemoteDescription(data);
           const answer = await peer.createAnswer();
@@ -60,15 +68,12 @@ export function useWebRTC(roomId: string, role: Role) {
           channel.send({
             type: "broadcast",
             event: "shout",
-            payload: { type: "answer", data: answer },
+            payload: { type: "answer", data: answer, role },
           });
-          alert("offer 수신 후 answer 생성 ✅");
         } else if (type === "answer") {
           await peer.setRemoteDescription(data);
-          alert("answer 수신 ✅");
         } else if (type === "candidate") {
           await peer.addIceCandidate(data);
-          alert("candidate 수신 ✅");
         }
       })
       .subscribe();
@@ -77,12 +82,11 @@ export function useWebRTC(roomId: string, role: Role) {
       peer.close();
       channel.unsubscribe();
     };
-  }, [roomId]);
+  }, [roomId, role]);
 
   // 위치 전송
   const sendLocation = (lat: number, lng: number) => {
     dataChannelRef.current?.send(JSON.stringify({ lat, lng, role }));
-    alert(`내 위치 전송: lat ${lat}, lng ${lng}`);
   };
 
   return { sendLocation, remoteLocation };
