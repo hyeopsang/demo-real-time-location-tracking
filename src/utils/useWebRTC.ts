@@ -14,7 +14,13 @@ export function useWebRTC(roomId: string, role: Role) {
 
   useEffect(() => {
     const peer = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+      iceServers: [
+        {
+          urls: "relay1.expressturn.com:3480",
+          username: "000000002071909251",
+          credential: "f1tftVJapyh88tYo+V8pJoX1vDg=",
+        },
+      ],
     });
     peerRef.current = peer;
 
