@@ -3,7 +3,10 @@ import { useWalkerStateStore } from "../store/walkerStateStore";
 import { useWebRTC } from "./useWebRTC";
 import { useGoogleMap } from "../useGoogleMap";
 
-export const useRealtimeWalker = (roomId: string, role: "walker" | "owner") => {
+export const useRealtimeWalker = (
+  roomId: string,
+  role: "walker" | "owner" | null
+) => {
   const { sendLocation, remoteLocation } = useWebRTC(roomId, role);
   const setWalkerCenter = useWalkerStateStore((state) => state.setCenter);
   const walkerCenter = useWalkerStateStore((state) => state.center);

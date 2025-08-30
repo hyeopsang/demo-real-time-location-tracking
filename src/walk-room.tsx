@@ -5,7 +5,7 @@ import { useMapStateStore } from "./store/mapStateStore";
 
 type WalkRoomProps = {
   roomId: string;
-  role: "walker" | "owner";
+  role: "walker" | "owner" | null;
 };
 
 export const WalkRoom = ({ roomId, role }: WalkRoomProps) => {

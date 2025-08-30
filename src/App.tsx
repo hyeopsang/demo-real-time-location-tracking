@@ -2,7 +2,7 @@ import { useState } from "react";
 import { WalkRoom } from "./walk-room";
 
 function App() {
-  const [role, setRole] = useState<"walker" | "owner">("owner");
+  const [role, setRole] = useState<"walker" | "owner" | null>(null);
   const roomId = "room-123"; // WebRTC 룸 ID
 
   // 역할 선택 후 WalkRoom 렌더링

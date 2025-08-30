@@ -12,7 +12,9 @@ export function useWebRTC(roomId: string, role: Role) {
   } | null>(null);
 
   useEffect(() => {
-    const peer = new RTCPeerConnection();
+    const peer = new RTCPeerConnection({
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    });
     peerRef.current = peer;
 
     // Supabase 채널 하나
@@ -23,22 +25,28 @@ export function useWebRTC(roomId: string, role: Role) {
       const dataChannel = peer.createDataChannel("location_channel");
       dataChannelRef.current = dataChannel;
 
-      dataChannel.onopen = () => console.log("Owner DataChannel open ✅");
+      dataChannel.onopen = () => {
+        console.log("Owner DataChannel open ✅"); // 여기서 open 메시지
+      };
       dataChannel.onclose = () => console.log("Owner DataChannel closed ❌");
       dataChannel.onerror = (err) =>
         console.log("Owner DataChannel Error:", err);
     } else {
       // 워커는 DataChannel을 peer.ondatachannel로 받음
       peer.ondatachannel = (event) => {
-        dataChannelRef.current = event.channel;
-        event.channel.onmessage = (e) => {
+        const channel = event.channel;
+        dataChannelRef.current = channel;
+
+        channel.onopen = () => console.log("Worker DataChannel open ✅"); // 여기서 open 메시지
+        channel.onclose = () => console.log("Worker DataChannel closed ❌");
+        channel.onerror = (err) =>
+          console.log("Worker DataChannel Error:", err);
+
+        channel.onmessage = (e) => {
           const loc = JSON.parse(e.data);
           if (loc.role === "walker")
             setRemoteLocation({ lat: loc.lat, lng: loc.lng });
         };
-        event.channel.onopen = () => console.log("Worker DataChannel open ✅");
-        event.channel.onclose = () =>
-          console.log("Worker DataChannel closed ❌");
       };
     }
 
@@ -83,10 +91,18 @@ export function useWebRTC(roomId: string, role: Role) {
       channel.unsubscribe();
     };
   }, [roomId, role]);
+  const waitForOpenChannel = (channel: RTCDataChannel) =>
+    new Promise<void>((resolve) => {
+      if (channel.readyState === "open") return resolve();
+      channel.onopen = () => resolve();
+    });
 
   // 위치 전송
-  const sendLocation = (lat: number, lng: number) => {
-    dataChannelRef.current?.send(JSON.stringify({ lat, lng, role }));
+  const sendLocation = async (lat: number, lng: number) => {
+    const channel = dataChannelRef.current;
+    if (!channel) return;
+    await waitForOpenChannel(channel);
+    channel.send(JSON.stringify({ lat, lng, role }));
   };
 
   return { sendLocation, remoteLocation };
