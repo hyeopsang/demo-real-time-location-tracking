@@ -52,6 +52,8 @@ export function useWebRTC(roomId: string, role: Role) {
 
     // ICE Candidate
     peer.onicecandidate = (event) => {
+      console.log("ICE candidate:", event.candidate);
+
       if (event.candidate) {
         channel.send({
           type: "broadcast",
